@@ -1,83 +1,142 @@
-import { FastifyPluginAsyncJsonSchemaToTs } from '@fastify/type-provider-json-schema-to-ts';
-import { idParamSchema } from '../../utils/reusedSchemas';
+import { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
+import { idParamSchema } from "../../utils/reusedSchemas";
 import {
   createUserBodySchema,
   changeUserBodySchema,
   subscribeBodySchema,
-} from './schemas';
-import type { UserEntity } from '../../utils/DB/entities/DBUsers';
-import DB from '../../utils/DB/DB';
-
+} from "./schemas";
+import type { UserEntity } from "../../utils/DB/entities/DBUsers";
+// users.map((user) => {
+    //   const subscribed = user?.subscribedToUserIds.map(async (profileId) => {
+    //     return await fastify.db.profiles.findOne({
+    //       key: "id",
+    //       equals: profileId,
+    //     });
+    //   });
+    //   return {
+    //     id: user?.id,
+    //     email: user?.email,
+    //     firstName: user?.firstName,
+    //     lastName: user?.lastName,
+    //     subscribedToUserIds: subscribed,
+    //   }
+    // })
 const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
   fastify
 ): Promise<void> => {
-  fastify.get('/', async function (request, reply): Promise<UserEntity[]> {
+  fastify.get("/", async function (request, reply): Promise<UserEntity[]> {
+    const users = await fastify.db.users.findMany();
     
+    return reply.send(users);
   });
 
   fastify.get(
-    '/:id',
+    "/:id",
     {
       schema: {
         params: idParamSchema,
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      
+      const user = await fastify.db.users.findOne({
+        key: "id",
+        equals: request.params.id,
+      });
+      if(!user) throw reply.code(404)
+      return reply.send(user)
     }
   );
 
   fastify.post(
-    '/',
+    "/",
     {
       schema: {
         body: createUserBodySchema,
       },
     },
-    async function (request, reply): Promise<UserEntity> {}
+    async function (request, reply): Promise<UserEntity> {
+      const user = await fastify.db.users.create(request.body);
+      return reply.send(user);
+    }
   );
 
   fastify.delete(
-    '/:id',
+    "/:id",
     {
       schema: {
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<UserEntity> {}
+    async function (request, reply): Promise<UserEntity> {
+      const user = await fastify.db.users.delete(request.params.id);
+      return reply.send(user);
+    }
   );
 
   fastify.post(
-    '/:id/subscribeTo',
+    "/:id/subscribeTo",
     {
       schema: {
         body: subscribeBodySchema,
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<UserEntity> {}
+    async function (request, reply): Promise<UserEntity> {
+      const user = await fastify.db.users.findOne({
+        key: "id",
+        equals: request.params.id,
+      });
+      user?.subscribedToUserIds.push(request.body.userId);
+      await fastify.db.users.change(request.params.id, {
+        email: user?.email,
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        subscribedToUserIds: user?.subscribedToUserIds,
+      });
+      return reply.send(user);
+    }
   );
 
   fastify.post(
-    '/:id/unsubscribeFrom',
+    "/:id/unsubscribeFrom",
     {
       schema: {
         body: subscribeBodySchema,
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<UserEntity> {}
+    async function (request, reply): Promise<UserEntity> {
+      const user = await fastify.db.users.findOne({
+        key: "id",
+        equals: request.params.id,
+      });
+      const idx = user?.subscribedToUserIds.indexOf(request.body.userId);
+      if (typeof idx === "number") {
+        user?.subscribedToUserIds.splice(idx, 1);
+      }
+      await fastify.db.users.change(request.params.id, {
+        email: user?.email,
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        subscribedToUserIds: user?.subscribedToUserIds,
+      });
+      return reply.send(user);
+    }
   );
 
   fastify.patch(
-    '/:id',
+    "/:id",
     {
       schema: {
         body: changeUserBodySchema,
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<UserEntity> {}
+    async function (request, reply): Promise<UserEntity> {
+      return reply.send(
+        await fastify.db.users.change(request.params.id, request.body)
+      );
+    }
   );
 };
 
