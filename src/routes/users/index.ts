@@ -6,27 +6,13 @@ import {
   subscribeBodySchema,
 } from "./schemas";
 import type { UserEntity } from "../../utils/DB/entities/DBUsers";
-// users.map((user) => {
-    //   const subscribed = user?.subscribedToUserIds.map(async (profileId) => {
-    //     return await fastify.db.profiles.findOne({
-    //       key: "id",
-    //       equals: profileId,
-    //     });
-    //   });
-    //   return {
-    //     id: user?.id,
-    //     email: user?.email,
-    //     firstName: user?.firstName,
-    //     lastName: user?.lastName,
-    //     subscribedToUserIds: subscribed,
-    //   }
-    // })
+
 const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
   fastify
 ): Promise<void> => {
   fastify.get("/", async function (request, reply): Promise<UserEntity[]> {
     const users = await fastify.db.users.findMany();
-    
+
     return reply.send(users);
   });
 
@@ -42,8 +28,8 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         key: "id",
         equals: request.params.id,
       });
-      if(!user) throw reply.code(404)
-      return reply.send(user)
+      if (!user) throw reply.code(404);
+      return reply.send(user);
     }
   );
 
@@ -69,6 +55,21 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
     },
     async function (request, reply): Promise<UserEntity> {
       const user = await fastify.db.users.delete(request.params.id);
+      const membertype = await fastify.db.profiles.findOne({
+        key: "userId",
+        equals: request.params.id,
+      });
+      const post = await fastify.db.posts.findOne({
+        key: "userId",
+        equals: request.params.id,
+      });
+      const profile = await fastify.db.profiles.findOne({
+        key: "userId",
+        equals: request.params.id,
+      });
+      await fastify.db.memberTypes.delete(membertype?.id || "");
+      await fastify.db.posts.delete(post?.id || "");
+      await fastify.db.profiles.delete(profile?.id || "");
       return reply.send(user);
     }
   );
